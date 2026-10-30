@@ -73,6 +73,94 @@ button, input, select { font: inherit; color: inherit; }
 .title { margin: 0; font-size: 18px; font-weight: 700; }
 .today { color: var(--muted); font-size: 14px; }
 
+/* ---- v2: 화면 전환 영역 ---- */
+.app-view { flex: 1; display: flex; flex-direction: column; }
+.app-view[hidden], .login[hidden], .loading[hidden] { display: none; }
+
+/* 불러오는 중 */
+.loading { margin: 0; padding: 60px 16px; text-align: center; color: var(--muted); }
+
+/* ⓪ 로그인 화면 */
+.login {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px 24px 80px;
+  text-align: center;
+}
+.login-icon { font-size: 48px; margin: 0; }
+.login-text { margin: 0 0 8px; color: var(--muted); line-height: 1.6; }
+.login-btn {
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: 999px;
+  padding: 12px 22px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.login-btn:hover:not(:disabled) { background: var(--hover); }
+.login-btn:disabled { opacity: 0.5; cursor: wait; }
+.login-error {
+  margin: 4px 0 0;
+  max-width: 320px;
+  color: #d93025;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* ⓪ 동기화 상태 + 계정 */
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 16px 8px;
+  font-size: 12px;
+}
+.sync-status { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sync-status[data-state="synced"] { color: var(--personal); }
+.sync-status[data-state="error"] { color: #d93025; font-weight: 600; }
+.account { position: relative; flex: 0 0 auto; }
+.account-btn {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  max-width: 160px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.account-btn:hover { background: var(--hover); color: var(--text); }
+.account-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 10;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  padding: 4px;
+}
+.logout-btn {
+  border: none;
+  background: none;
+  padding: 6px 14px;
+  border-radius: 6px;
+  white-space: nowrap;
+  cursor: pointer;
+  font-size: 13px;
+}
+.logout-btn:hover { background: var(--hover); }
+
 /* ②③ 진행률 */
 .progress { padding: 4px 16px 12px; border-bottom: 1px solid var(--line); }
 .progress-row { display: flex; align-items: center; gap: 10px; }

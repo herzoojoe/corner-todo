@@ -10,9 +10,8 @@ $Height = 780    # 창 세로 크기
 $Margin = 8      # 화면 가장자리와 띄울 간격
 $Title  = 'Corner Todo'   # index.html의 <title>과 같아야 함
 
-# ---- 이 파일이 있는 폴더의 index.html 주소 만들기 ----
-$path = Join-Path $PSScriptRoot 'index.html'
-$Url  = 'file:///' + (($path -replace '\\', '/') -replace ' ', '%20')
+# ---- 앱 주소 (v2: 인터넷 주소 — PC와 폰이 같은 앱을 씀) ----
+$Url = 'https://herzoojoe.github.io/corner-todo/'
 
 # ---- 크롬 위치 찾기 (흔한 설치 위치 3곳) ----
 $chrome = @(
