@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>예전 할 일 옮기기</title>
+  <style>
+    /* 이사 도우미: v1(D 드라이브 파일 주소)의 사물함에서 할 일을 꺼내 새 앱으로 넘겨 줌 */
+    :root { --bg: #f4f5f7; --card: #fff; --text: #1f2328; --muted: #6b7280; --line: #e5e7eb; --accent: #4f6bed; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #15171b; --card: #1e2127; --text: #e6e8eb; --muted: #9198a1; --line: #2e333a; --accent: #7b93ff; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: "Malgun Gothic", "맑은 고딕", system-ui, sans-serif; font-size: 15px; line-height: 1.6; }
+    main { max-width: 500px; margin: 0 auto; min-height: 100vh; background: var(--card); padding: 24px 20px; display: flex; flex-direction: column; gap: 14px; }
+    h1 { font-size: 19px; margin: 0; }
+    p { margin: 0; }
+    .muted { color: var(--muted); font-size: 14px; }
+    ul { margin: 0; padding: 0; list-style: none; border: 1px solid var(--line); border-radius: 8px; max-height: 320px; overflow-y: auto; }
+    li { padding: 8px 12px; border-bottom: 1px solid var(--line); display: flex; gap: 8px; }
+    li:last-child { border-bottom: none; }
+    li.done span:last-child { text-decoration: line-through; color: var(--muted); }
+    .go { border: none; border-radius: 999px; background: var(--accent); color: #fff; font: inherit; font-weight: 700; padding: 12px 20px; cursor: pointer; }
+    .go:hover { filter: brightness(1.08); }
+    .box { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>📦 예전 할 일 옮기기</h1>
+    <p class="muted">PC에서만 쓰던 v1 앱의 할 일을, PC와 폰이 함께 쓰는 공용 사물함으로 옮깁니다. 예전 할 일은 지우지 않고 그대로 둡니다.</p>
+    <div id="result"></div>
+  </main>
+
+  <script>
+    // 새 앱 주소
+    var APP_URL = 'https://herzoojoe.github.io/corner-todo/';
+    var LABELS = { work: '업무', personal: '개인', study: '공부' };
+    var result = document.getElementById('result');
+
+    function message(html) { result.innerHTML = html; }
+
+    // 예전 사물함에서 할 일 꺼내기
+    var todos = [];
+    try {
+      var data = JSON.parse(localStorage.getItem('cornerTodo.todos'));
+      if (Array.isArray(data)) {
+        todos = data.filter(function (t) {
+          return t && typeof t.id === 'string' && typeof t.text === 'string' && LABELS[t.category] && typeof t.done === 'boolean';
+        });
+      }
+    } catch (e) { todos = []; }
+
+    if (location.protocol !== 'file:') {
+      message('<div class="box"><p>이 페이지는 <b>PC 크롬</b>에서 D 드라이브 파일 주소로 열어야 합니다.</p><p class="muted">크롬 주소창에 <code>file:///D:/To-do%20List%20Project/migrate.html</code> 을 붙여넣으세요.</p></div>');
+    } else if (todos.length === 0) {
+      message('<div class="box"><p>이 브라우저에는 예전 할 일이 없어요.</p><p class="muted">예전 앱을 <b>크롬</b>에서 썼다면, 이 페이지도 크롬에서 열었는지 확인하세요. (엣지에서 열면 엣지의 사물함을 보게 됩니다)</p></div>');
+    } else {
+      // 목록 미리 보기 (글자는 textContent로 안전하게)
+      var p = document.createElement('p');
+      p.innerHTML = '예전 할 일 <b>' + todos.length + '개</b>를 찾았어요.';
+      var ul = document.createElement('ul');
+      todos.forEach(function (t) {
+        var li = document.createElement('li');
+        if (t.done) li.className = 'done';
+        var tag = document.createElement('span'); tag.textContent = '[' + LABELS[t.category] + ']';
+        var text = document.createElement('span'); text.textContent = (t.done ? '✓ ' : '') + t.text;
+        li.append(tag, text);
+        ul.appendChild(li);
+      });
+      var btn = document.createElement('button');
+      btn.className = 'go';
+      btn.textContent = '공용 사물함으로 옮기기 →';
+      btn.addEventListener('click', function () {
+        // 할 일 목록을 글자(JSON) → 바이트 → base64로 바꿔 주소 뒤에 붙여 새 앱으로 넘김
+        var json = JSON.stringify(todos);
+        var bytes = new TextEncoder().encode(json);
+        var bin = '';
+        bytes.forEach(function (b) { bin += String.fromCharCode(b); });
+        var code = btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        location.href = APP_URL + '#import=' + code;
+      });
+      var note = document.createElement('p');
+      note.className = 'muted';
+      note.textContent = '버튼을 누르면 새 앱이 열리고, 로그인한 뒤 "예전 할 일을 옮길까요?"라고 묻습니다. 이미 옮긴 할 일은 두 번 들어가지 않습니다.';
+      result.append(p, ul, btn, note);
+    }
+  </script>
+</body>
+</html>

@@ -2,6 +2,8 @@
 // Corner Todo — 화면의 두뇌 (동작)
 // v1 (1~6단계): 추가·체크·삭제·수정·필터·진행률·날짜·단축키·되돌리기
 // v2 9단계: 구글 로그인 + Firebase 공용 사물함(Firestore) 저장 + 실시간 연동
+// v2 10단계: 예전(v1) 할 일 옮기기 + 오프라인 저장
+// v2 11단계: 폰 다듬기(길게 눌러 수정) + 앱 설치(서비스 워커)
 // =========================================
 
 // ---- Firebase 도구 불러오기 (설치 없이 인터넷 주소에서 바로 가져옴) ----
@@ -10,7 +12,8 @@ import {
   getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut,
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
 import {
-  getFirestore, collection, doc, query, orderBy, onSnapshot,
+  getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+  collection, doc, query, orderBy, onSnapshot,
   setDoc, updateDoc, deleteDoc, writeBatch,
 } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
@@ -18,7 +21,17 @@ import { firebaseConfig } from './firebase-config.js';
 // ---- Firebase 연결 ----
 const fbApp = initializeApp(firebaseConfig);
 const auth = getAuth(fbApp);               // 신분증 확인 담당 (구글 로그인)
-const db = getFirestore(fbApp);            // 인터넷 공용 사물함
+// 인터넷 공용 사물함 + 기기 안 임시 보관함 (F-45, F-46)
+// 임시 보관함 덕분에 인터넷이 끊겨도 마지막 목록이 보이고, 바꾼 내용은 연결되면 자동으로 올라감
+let db;
+try {
+  db = initializeFirestore(fbApp, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+  });
+} catch (err) {
+  console.warn('임시 보관함을 쓸 수 없어 기본 방식으로 연결합니다.', err);
+  db = getFirestore(fbApp);
+}
 const provider = new GoogleAuthProvider();
 provider.setCustomParameters({ prompt: 'select_account' }); // 계정 고르는 화면 항상 보여주기
 
@@ -189,12 +202,23 @@ function undoDelete() {
 
 function showUndoToast(message) {
   toastMsg.textContent = message;
+  undoBtn.hidden = false;
   toast.hidden = false;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => {
     lastDeleted = null;                     // 5초가 지나면 되돌리기 불가
     hideToast();
   }, UNDO_SECONDS * 1000);
+}
+
+// 알림만 보여 주는 안내 (되돌리기 버튼 없음)
+function showInfoToast(message) {
+  lastDeleted = null;
+  toastMsg.textContent = message;
+  undoBtn.hidden = true;
+  toast.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideToast, UNDO_SECONDS * 1000);
 }
 
 function hideToast() {
@@ -257,6 +281,68 @@ function setFilter(filter) {
 }
 
 // =========================================
+// 예전(v1) 할 일 옮기기 (F-47, F-48)
+// migrate.html(이사 도우미)이 주소 뒤에 #import=... 로 할 일을 담아 보내 줌
+// =========================================
+const IMPORT_KEY = 'cornerTodo.pendingImport';
+let importing = false;
+
+// 주소에 실려 온 할 일을 잠시 보관하고, 주소는 깨끗하게 되돌림
+function captureImportFromHash() {
+  const m = location.hash.match(/^#import=([A-Za-z0-9_-]+)$/);
+  if (!m) return;
+  try { sessionStorage.setItem(IMPORT_KEY, m[1]); } catch (err) { /* 보관 실패 시 옮기기 생략 */ }
+  history.replaceState(null, '', location.pathname + location.search);
+}
+
+// base64 글자 → 할 일 목록
+function decodeImport(code) {
+  try {
+    const b64 = code.replace(/-/g, '+').replace(/_/g, '/');
+    const bin = atob(b64 + '==='.slice((b64.length + 3) % 4));
+    const bytes = Uint8Array.from(bin, (ch) => ch.charCodeAt(0));
+    const list = JSON.parse(new TextDecoder().decode(bytes));
+    if (!Array.isArray(list)) return [];
+    return list.filter(isValidTodo).map((t) => ({
+      id: t.id,
+      text: String(t.text).slice(0, 100),
+      category: t.category,
+      done: t.done,
+      createdAt: t.createdAt || nowISO(),
+      doneAt: t.done ? (t.doneAt || nowISO()) : null,
+      updatedAt: nowISO(),
+    }));
+  } catch (err) {
+    console.warn('옮길 할 일을 읽지 못했습니다.', err);
+    return [];
+  }
+}
+
+// 로그인 후 공용 사물함 목록을 처음 받은 뒤에 한 번 실행
+function maybeImport() {
+  if (importing || !todosCol) return;
+  let code = null;
+  try { code = sessionStorage.getItem(IMPORT_KEY); } catch (err) { code = null; }
+  if (!code) return;
+  importing = true;
+  try { sessionStorage.removeItem(IMPORT_KEY); } catch (err) { /* 무시 */ }
+
+  const items = decodeImport(code);
+  const existing = new Set(todos.map((t) => t.id));
+  const fresh = items.filter((t) => !existing.has(t.id));   // 이미 옮긴 것은 건너뜀
+
+  if (fresh.length === 0) {
+    showInfoToast(items.length ? '이미 모두 옮겨져 있어요' : '옮길 할 일을 찾지 못했어요');
+  } else if (confirm(`예전 할 일 ${fresh.length}개를 공용 사물함으로 옮길까요?`)) {
+    const batch = writeBatch(db);
+    fresh.forEach((t) => batch.set(todoRef(t.id), t));
+    runWrite(batch.commit());
+    showInfoToast(`📦 예전 할 일 ${fresh.length}개를 옮겼어요`);
+  }
+  importing = false;
+}
+
+// =========================================
 // 실시간 구독: 공용 사물함 지켜보기 (F-40 ~ F-44)
 // =========================================
 
@@ -280,6 +366,9 @@ function subscribeTodos(uid) {
     // 진행률·남은 개수만 먼저 바꿔 둠 (F-44). 목록은 수정이 끝날 때 다시 그림
     if (editingId !== null) renderSummary();
     else render();
+
+    // 공용 사물함의 최신 목록을 받은 뒤에 옮기기 (중복 확인을 위해)
+    if (!fromCache) maybeImport();
   }, (err) => {
     console.error('구독 오류:', err);
     if (err.code === 'permission-denied') {
@@ -556,6 +645,39 @@ todoList.addEventListener('dblclick', (e) => {
   startEdit(e.target.closest('.todo').dataset.id);
 });
 
+// 폰: 할 일 글자를 길게(0.5초) 누르면 수정 시작 (F-52)
+// 손가락을 뗄 때 수정을 시작해야 폰 키보드가 바로 올라옴
+const LONG_PRESS_MS = 500;
+let press = null;   // { id, x, y, time, el }
+
+todoList.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'mouse') return;
+  const text = e.target.closest('.text');
+  if (!text) return;
+  press = { id: text.closest('.todo').dataset.id, x: e.clientX, y: e.clientY, time: Date.now(), el: text };
+  text.classList.add('pressing');
+});
+todoList.addEventListener('pointermove', (e) => {
+  if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 10) cancelPress();  // 스크롤하면 취소
+});
+todoList.addEventListener('pointerup', (e) => {
+  if (!press) return;
+  const { id, time } = press;
+  cancelPress();
+  if (Date.now() - time >= LONG_PRESS_MS) {
+    e.preventDefault();
+    startEdit(id);
+  }
+});
+todoList.addEventListener('pointercancel', cancelPress);
+todoList.addEventListener('contextmenu', (e) => {
+  if (e.target.closest('.text')) e.preventDefault();   // 길게 누를 때 뜨는 복사 메뉴 막기
+});
+function cancelPress() {
+  if (press && press.el) press.el.classList.remove('pressing');
+  press = null;
+}
+
 todoList.addEventListener('keydown', (e) => {
   if (!e.target.closest('.todo.editing')) return;
   if (e.key === 'Enter') {
@@ -601,7 +723,13 @@ document.addEventListener('keydown', (e) => {
 window.addEventListener('online', renderStatus);
 window.addEventListener('offline', renderStatus);
 
+// ---- 앱 설치·오프라인용 서비스 워커 등록 (11단계) ----
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  navigator.serviceWorker.register('./sw.js').catch((err) => console.warn('서비스 워커 등록 실패', err));
+}
+
 // ---- 시작 ----
+captureImportFromHash();
 catSelect.value = settings.lastCategory;
 renderToday();
 setInterval(renderToday, 60 * 1000);

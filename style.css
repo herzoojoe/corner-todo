@@ -401,3 +401,28 @@ button, input, select { font: inherit; color: inherit; }
 }
 .clear-btn:hover:not(:disabled) { background: var(--hover); color: var(--text); }
 .clear-btn:disabled { opacity: 0.4; cursor: default; }   /* 완료 항목이 없으면 흐리게 */
+
+/* =========================================
+   11단계: 폰(손가락) 화면 다듬기 (F-51)
+   pointer: coarse = 마우스가 아니라 손가락으로 쓰는 기기
+   ========================================= */
+@media (pointer: coarse) {
+  /* 체크박스·버튼을 손가락으로 누르기 쉬운 크기(44px)로 */
+  .check { width: 24px; height: 24px; margin: 10px; }
+  .icon-btn { opacity: 0.7; min-width: 44px; min-height: 44px; font-size: 17px; }
+  .filter { min-height: 44px; }
+  .add-btn { flex-basis: 48px; }
+  .cat-select, .add-input { min-height: 44px; font-size: 16px; }  /* 16px 미만이면 폰이 화면을 확대함 */
+  .edit-select, .edit-input { min-height: 40px; font-size: 16px; }
+  .clear-btn, .account-btn, .logout-btn { min-height: 36px; }
+  .todo { padding: 2px 4px; }
+
+  /* 길게 눌러 수정할 때 글자 선택·복사 메뉴가 뜨지 않게 */
+  .text { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  .text.pressing { opacity: 0.6; transition: opacity 0.5s; }
+}
+
+/* 폰 홈 화면 앱으로 열었을 때: 위아래 시스템 영역 피하기 */
+@media (display-mode: standalone) {
+  .app { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+}
