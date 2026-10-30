@@ -5,7 +5,7 @@
 // - Firebase 도구(버전이 고정된 파일)는 "보관본 먼저"
 // - 할 일 데이터는 여기서 다루지 않음 (Firestore가 따로 관리)
 // =========================================
-const CACHE = 'corner-todo-v1';
+const CACHE = 'corner-todo-v2';
 const SHELL = [
   './', './index.html', './style.css', './app.js', './firebase-config.js',
   './manifest.json', './icons/icon-192.png', './icons/icon-512.png', './icons/favicon-32.png',
